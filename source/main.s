@@ -24,11 +24,8 @@ bl SetGpio
 .unreq pinNum
 .unreq pinVal
 
-mov r2,#0x3F0000
-wait1$:
-sub r2,#1
-cmp r2,#0
-bne wait1$
+mov r0,#0x80000
+bl Wait
 
 pinNum .req r0
 pinVal .req r1
@@ -38,9 +35,7 @@ bl SetGpio
 .unreq pinNum
 .unreq pinVal
 
-mov r2,#0x3F0000
-wait2$:
-sub r2,#1
-cmp r2,#0
-bne wait2$
+mov r0,#0x80000
+bl Wait
+
 b loop$
