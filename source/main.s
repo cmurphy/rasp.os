@@ -5,57 +5,66 @@ _start:
 b main
 .section .text
 main:
-mov sp,#0x8000
+  mov sp,#0x8000
 
-pinNum .req r0
-pinFunc .req r1
-mov pinNum,#16
-mov pinFunc,#1
-bl SetGpioFunction
-.unreq pinNum
-.unreq pinFunc
+  @ Initialize frame buffer with width 1024, height 768, bit depth 16
+  mov r0,#1024
+  mov r1,#768
+  mov r2,#16
+  bl InitialiseFrameBuffer
 
-@ Load the pattern sequence
-@ Initialize sequence index to 0
-ptrn .req r4
-ldr ptrn,=pattern
-ldr ptrn,[ptrn]
-seq .req r5
-mov seq,#0
+  @ Check if returned value was 0 - if it was, there was no error
+  teq r0,#0
+  bne noError$
 
-loop$:
-pinNum .req r0
-pinVal .req r1
-mov pinNum,#16
-mov pinVal,#0
-bl SetGpio
-.unreq pinNum
-.unreq pinVal
+  @ If there was an error, turn on the OK LED and wait forever
+  mov r0,#16
+  mov r1,#1
+  bl SetGpioFunction
+  mov r0,#16
+  mov r1,#0
+  bl SetGpio
 
-mov r0,#0x40000
-bl Wait
+  error$:
+    b error$
 
-pinNum .req r0
-pinVal .req r1
-mov pinNum,#16
-@ Set value to 1 if current is 1
-mov pinVal,#1
-lsl pinVal,seq
-and pinVal,ptrn
-bl SetGpio
-.unreq pinNum
-.unreq pinVal
+  @ Move the frame buffer address into r4
+  noError$:
+    fbInfoAddr .req r4
+    mov fbInfoAddr,r0
 
-mov r0,#0x40000
-bl Wait
+    render$:
+      @ Load the frame buffer address
+      fbAddr .req r3
+      ldr fbAddr,[fbInfoAddr,#32]
 
-add seq,#1
-cmp seq,#32
-moveq seq,#0
+      @ while y=768 > 0
+      colour .req r0
+      y .req r1
+      mov y,#768
+      drawRow$:
+        @ while x=1024 > 0
+        x .req r2
+        mov x,#1024
+        drawPixel$:
+          strh colour,[fbAddr] /* Store the low half of fbAddr in colour */
+          @ Increment address
+          add fbAddr,#2
+          @ Decrement counter
+          sub x,#1
+          @ Exit loop if done
+          teq x,#0
+          bne drawPixel$
 
-b loop$
+        @ Decrement counter
+        sub y,#1
+        @ Increment color value
+        add colour,#1
+        teq y,#0
+        bne drawRow$
 
-.section .data
-.align 2
-pattern:
-.int 0b11111111101010100010001000101010
+      b render$
+
+      .unreq fbAddr
+      .unreq fbInfoAddr
+
