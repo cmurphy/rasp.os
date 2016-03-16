@@ -33,38 +33,66 @@ main:
     fbInfoAddr .req r4
     mov fbInfoAddr,r0
 
-    render$:
-      @ Load the frame buffer address
-      fbAddr .req r3
-      ldr fbAddr,[fbInfoAddr,#32]
+    bl SetGraphicsAddress
 
-      @ while y=768 > 0
-      colour .req r0
-      y .req r1
-      mov y,#768
-      drawRow$:
-        @ while x=1024 > 0
-        x .req r2
-        mov x,#1024
-        drawPixel$:
-          strh colour,[fbAddr] /* Store the low half of fbAddr in colour */
-          @ Increment address
-          add fbAddr,#2
-          @ Decrement counter
-          sub x,#1
-          @ Exit loop if done
-          teq x,#0
-          bne drawPixel$
+    @ Initialize variables
+    lastRand .req r7
+    lastX .req r8
+    lastY .req r9
+    color .req r10
+    nextX .req r5
+    nextY .req r6
+    mov lastRand, #0
+    mov color,#0
+    mov lastX, #0
+    mov lastY, #0
 
-        @ Decrement counter
-        sub y,#1
-        @ Increment color value
-        add colour,#1
-        teq y,#0
-        bne drawRow$
+    draw$:
+      @ Generate random number, with the last random number as a seed
+      mov r0, lastRand
+      bl Random
+      mov lastRand, r0
+      @ Set it as the next X coordinate
+      mov nextX, lastRand
+      @ Generate another random number
+      bl Random
+      mov lastRand, r0
+      @ Set it as the next Y coordinate
+      mov nextY, lastRand
+      @ Set the last random number to be the last Y coordinate generated
+      mov lastRand, nextY
 
-      b render$
+      @ Set the color
+      mov r0, color
+      @ Increment the color
+      add color, #1
+      @ Reset to zero if reached max
+      lsl color, #16
+      lsr color, #16
+      bl SetForeColour
 
-      .unreq fbAddr
-      .unreq fbInfoAddr
+      @ Set x0,y0
+      mov r0,lastX
+      mov r1,lastY
+      @ Set x1,y1 converted to a number between 0 and 1023
+      lsr r2,nextX, #22
+      lsr r3,nextY, #22
+      @ If Y is too high, restart
+      cmp r3, #768
+      bhs draw$
 
+      @ Set last x/y coordinates for next time
+      mov lastX, r2
+      mov lastY, r3
+
+      @ Draw the line
+      bl DrawLine
+
+      b draw$
+
+      .unreq lastX
+      .unreq lastY
+      .unreq nextX
+      .unreq nextY
+      .unreq color
+      .unreq lastRand
